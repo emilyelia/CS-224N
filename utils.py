@@ -1,43 +1,78 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+CS224N 2018-19: Homework 4
+nmt.py: NMT Model
+Pencheng Yin <pcyin@cs.cmu.edu>
+Sahil Chopra <schopra8@stanford.edu>
+"""
+
+import math
+from typing import List
 
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-def normalizeRows(x):
-    """ Row normalization function
 
-    Implement a function that normalizes each row of a matrix to have
-    unit length.
+def pad_sents(sents, pad_token):
+    """ Pad list of sentences according to the longest sentence in the batch.
+    @param sents (list[list[str]]): list of sentences, where each sentence
+                                    is represented as a list of words
+    @param pad_token (str): padding token
+    @returns sents_padded (list[list[str]]): list of sentences where sentences shorter
+        than the max length sentence are padded out with the pad_token, such that
+        each sentences in the batch now has equal length.
     """
-    N = x.shape[0]
-    x /= np.sqrt(np.sum(x**2, axis=1)).reshape((N,1)) + 1e-30
-    return x
+    sents_padded = []
 
-def softmax(x):
-    """Compute the softmax function for each row of the input x.
-    It is crucial that this function is optimized for speed because
-    it will be used frequently in later code. 
+    ### YOUR CODE HERE (~6 Lines)
 
-    Arguments:
-    x -- A D dimensional vector or N x D dimensional numpy matrix.
-    Return:
-    x -- You are allowed to modify x in-place
+
+    ### END YOUR CODE
+
+    return sents_padded
+
+
+
+def read_corpus(file_path, source):
+    """ Read file, where each sentence is dilineated by a `\n`.
+    @param file_path (str): path to file containing corpus
+    @param source (str): "tgt" or "src" indicating whether text
+        is of the source language or target language
     """
-    orig_shape = x.shape
+    data = []
+    for line in open(file_path):
+        sent = line.strip().split(' ')
+        # only append <s> and </s> to the target sentence
+        if source == 'tgt':
+            sent = ['<s>'] + sent + ['</s>']
+        data.append(sent)
 
-    if len(x.shape) > 1:
-        # Matrix
-        tmp = np.max(x, axis=1)
-        x -= tmp.reshape((x.shape[0], 1))
-        x = np.exp(x)
-        tmp = np.sum(x, axis=1)
-        x /= tmp.reshape((x.shape[0], 1))
-    else:
-        # Vector
-        tmp = np.max(x)
-        x -= tmp
-        x = np.exp(x)
-        tmp = np.sum(x)
-        x /= tmp
+    return data
 
-    assert x.shape == orig_shape
-    return x
+
+def batch_iter(data, batch_size, shuffle=False):
+    """ Yield batches of source and target sentences reverse sorted by length (largest to smallest).
+    @param data (list of (src_sent, tgt_sent)): list of tuples containing source and target sentence
+    @param batch_size (int): batch size
+    @param shuffle (boolean): whether to randomly shuffle the dataset
+    """
+    batch_num = math.ceil(len(data) / batch_size)
+    index_array = list(range(len(data)))
+
+    if shuffle:
+        np.random.shuffle(index_array)
+
+    for i in range(batch_num):
+        indices = index_array[i * batch_size: (i + 1) * batch_size]
+        examples = [data[idx] for idx in indices]
+
+        examples = sorted(examples, key=lambda e: len(e[0]), reverse=True)
+        src_sents = [e[0] for e in examples]
+        tgt_sents = [e[1] for e in examples]
+
+        yield src_sents, tgt_sents
+
